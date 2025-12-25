@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "LightControl.h"
+#include "soc/rmt_struct.h" //gives rmt item datatype
+
 
 #define stripLength 300
 #define numStrips 10
@@ -18,7 +20,8 @@
 
 void app_main() { //apparently this is the standard main function for the esp-idf for some reason
     //uint32_t t1,t2=timer_read();
-    uint8_t outPins[numStrips]={10,11,12,13,14,15,16,17,18,19}; //idk if these pins even actually exist, update when I figure that out
+    uint8_t outPins[numStrips];
+    //outPins={10,11,12,13,14,15,16,17,18,19}; //idk if these pins even actually exist, update when I figure that out
     for(int i=0;i<10;i++){ //sets values for strips array defined in LightControl.c
         strips[i]->length=stripLength;
         strips[i]->outPin=outPins[i];
@@ -32,7 +35,7 @@ void app_main() { //apparently this is the standard main function for the esp-id
         
         
         for(int i=0;i<numStrips;i++){ //by this time, strip structs should be prepared, they are now being translated to output
-            buildFrame((strips[i]->colors),&frames[i]);
+            buildFrame(strips[i]->color,frames[i]); //use -> reference becayse strips[i] is a pointer (never dereferenced)
         }
         for(int i=0;i<numStrips;i++){ //making this its own for loop to avoid any processing delays making the strips seeming more out of sync
             push(frames[i],i);

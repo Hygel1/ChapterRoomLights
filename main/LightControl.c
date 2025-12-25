@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "LightControl.h"
-#include "driver/rmt.h"
-#include "esp_err.h"
+
 #define stripLength 300
 #define numStrips 10 //10 strips of 300 leds, strips are meant to be placed parallel from each other
 #define standardBrightness 75 //this will likely be a value that I need to test and calibrate based on what I see from the lights, hopefully a somewhat central value rather than max
@@ -12,31 +11,50 @@ uint8_t outPins[numStrips];
 //uint16_t stripLength=300;
 //uint8_t numStrips=100;
 
+/**
+ * @brief initialize strip lighting settings for all strips
+ * 
+ */
 void init(){
     for(uint16_t i=0;i<10;i++){
         strips[i]->length=stripLength;
         for(int q=0;q<stripLength;q++) strips[i]->brightness[q]=0xFFFF/2; //set all brightnesses to half
     }
 }
+/**
+ * @brief init stip lighting settings for a single strip
+ * 
+ * @param ledStrip 
+ */
 void stripInit(struct LightStrip *ledStrip){
     ledStrip->length=stripLength;
     for(uint16_t i=0;i<stripLength;i++) ledStrip->brightness[i]=standardBrightness;
 }
-//takes a single color value and assigns to all leds
-void stripFill(struct LightStrip *ledStrip, uint8_t colors[3]){
-    for(uint16_t i=0;i<ledStrip->length;i++) for(int k=0;k<3;k++) ledStrip->color[i][k]=(uint8_t)colors[k];
+/**takes a single color value and assigns to all leds
+ * 
+ * colors dimensions = [3]
+ */
+void stripFill(struct LightStrip *ledStrip, uint8_t *colors){
+    for(uint16_t i=0;i<ledStrip->length;i++) for(int k=0;k<3;k++) ledStrip->color[i][k]=colors[k];
 }
-//takes array of color values to be assigned to leds and outputs to strip
-void stripAssign(struct LightStrip *ledStrip, uint8_t colors[stripLength][3]){
-    for(uint16_t i=0;i<ledStrip->length;i++) for(int k=0;k<3;k++) (ledStrip->color[i][k])=(uint8_t)(colors[i][k]);
+/**takes array of color values to be assigned to leds and outputs to strip
+ * colors dimensions = [stripLength][3]
+ */
+void stripAssign(struct LightStrip *ledStrip, uint8_t (*colors)[3]){
+    for(uint16_t i=0;i<ledStrip->length;i++) for(int k=0;k<3;k++) ledStrip->color[i][k]=colors[i][k];
 }
-//takes a single brightness value and assigns to entire strip
+/**takes a single brightness value and assigns to entire strip
+ * 
+ */
 void brightnessFill(struct LightStrip *ledStrip, uint32_t brightnessVal){
-    for(uint16_t i=0;i<ledStrip->length;i++) (ledStrip->brightness[i])= (uint8_t)(brightnessVal);
+    for(uint16_t i=0;i<ledStrip->length;i++) (ledStrip->brightness[i])= brightnessVal;
 }
-//takes an array of brightness values and assigns to corresponding leds on strip
-void brightnessAssign(struct LightStrip *ledStrip, uint32_t brightnessVals[stripLength]){
-    for(uint16_t i=0;i<ledStrip->length;i++) (ledStrip->brightness[i])=(uint32_t)(brightnessVals[i]);
+/**takes an array of brightness values and assigns to corresponding leds on strip
+ * brightnessVals dimensions = [stripLength]
+ * 
+ */
+void brightnessAssign(struct LightStrip *ledStrip, uint32_t *brightnessVals){
+    for(uint16_t i=0;i<ledStrip->length;i++) (ledStrip->brightness[i])=brightnessVals[i];
 }
 /**
  * @brief 'throws' light across room, aligned across all strips in timing, color, and brightness
@@ -46,8 +64,12 @@ void brightnessAssign(struct LightStrip *ledStrip, uint32_t brightnessVals[strip
  * @param color array of colors to be set to LEDs, should generally be uniform
  * @param brightness array of brightnesses to be set to each led row, should generally be uniform
  * @param bpm determines how fast the lights should move, used to define the delay time between loop iterations
+ * 
+ * ledStrip dimensions [numStrips]
+ * colorSet dimensions [stripLength][3]
+ * brightnessSet[stripLength]
  */
-void acrossAll(struct LightStrip *ledStrip[numStrips], uint8_t colorSet[stripLength][3], uint32_t brightnessSet[stripLength], uint8_t bpm){
+void acrossAll(struct LightStrip *ledStrip, uint8_t (*colorSet)[3], uint32_t *brightnessSet, uint8_t bpm){
     blackout(ledStrip);
     uint32_t delay = (uint32_t)((1/((double)bpm)*60)/310*1000); 
     /*strip is 5 meters long with 300 LEDs
@@ -60,8 +82,8 @@ void acrossAll(struct LightStrip *ledStrip[numStrips], uint8_t colorSet[stripLen
         for(uint8_t q=0;q<numStrips;q++){ //set each strip's led at index i
             for(int w=0;w<9;w++){ //trail 10 leds
                 if(i>0){
-                for(int k=0;k<3;k++) (ledStrip[q]->color[i-w][k])=(uint8_t)(colorSet[i-w][k]);
-                (ledStrip[q]->brightness[i-w])=(uint32_t)(brightnessSet[i-w]);
+                for(int k=0;k<3;k++) ledStrip[q].color[i-w][k]=(uint8_t)(colorSet[i-w][k]); //use . to access struct internals because wokring with direct struct not a pointer (dereferenced in param)
+                (ledStrip[q].brightness[i-w])=(uint32_t)(brightnessSet[i-w]);
                 }
             }
         }
@@ -72,8 +94,8 @@ void acrossAll(struct LightStrip *ledStrip[numStrips], uint8_t colorSet[stripLen
         blackout(ledStrip); //reset strip before iteration
         for(uint8_t q=0;q<numStrips;q++){
             for(uint8_t w=i;w>0;w--){ //i defines the inner index, w pushes out to the edge, final value of 1 ensures that the final value is the final index (no overflow)
-            for(int k=0;k<3;k++) (ledStrip[q]->color[stripLength-w][k])=(uint8_t)(colorSet[stripLength-w][k]);
-            (ledStrip[q]->brightness[stripLength-w])=(uint32_t)(brightnessSet[stripLength-w]);
+            for(int k=0;k<3;k++) ledStrip[q].color[stripLength-w][k]=(uint8_t)(colorSet[stripLength-w][k]);
+            ledStrip[q].brightness[stripLength-w]=(uint32_t)(brightnessSet[stripLength-w]);
             }
         }
         
@@ -83,22 +105,26 @@ void acrossAll(struct LightStrip *ledStrip[numStrips], uint8_t colorSet[stripLen
  * @brief reset brightness to standard and color to black to init
  * 
  * @param ledStrip array of strips to black out
+ * 
+ * LightStrip dimensions [numStrips]
  */
-void blackout(struct LightStrip *ledStrip[numStrips]){
+void blackout(struct LightStrip *ledStrip){
     uint8_t black[3];
     for(int i=0;i<3;i++) black[i]=0;
     for(uint8_t i=0;i<numStrips;i++){
         for(uint16_t q=0;q<stripLength;q++){
-            for(int k=0;k<3;k++) (ledStrip[i]->color[q][k])=(uint8_t)(black[k]);
-            ledStrip[i]->brightness[q]=standardBrightness;
+            for(int k=0;k<3;k++) ledStrip[i].color[q][k]=(black[k]);
+            ledStrip[i].brightness[q]=standardBrightness;
         }
     }
 }
 
 /**
  * @brief controls functions start here. sets gpio values and initializes everything a
+ * 
+ * gpio dimensions [numStrips]
  */
-void rmtInit(uint8_t *gpio[numStrips]){
+void rmtInit(uint8_t *gpio){
     rmt_config_t stripConfigs[numStrips];;
     for(int i=0;i<numStrips;i++){ //ESP32 has 8 rmt channels which likely means that I'll max out at 8 possible individual strips
         stripConfigs[i].rmt_mode=RMT_MODE_TX;
@@ -141,13 +167,16 @@ rmt_item32_t rmtTranslate(uint8_t bit){
  * 
  * colors is the input for this function, defining the GRB code for each LED (each index represents an 8 bit code defining brightness of that led)
  * items is the output address, each value of the colors array will be translated to a bit and added to the items array as an rmt_item
+ * 
+ * colors dimensions = [stripLength][3]
+ * items dimensions [stripLength*24]
  */
-void buildFrame(uint8_t *colors[stripLength][3], rmt_item32_t *items[stripLength*24]){
+void buildFrame(uint8_t (*colors)[3], rmt_item32_t *items){
     uint32_t index=0; //removes the need for a 4th for loop by embedding the count
     for(int i=0;i<stripLength;i++){
         for(int color=0;color<3;color++){
             for(uint8_t bitNum=0;bitNum<8;bitNum++){ //build backwards
-                *items[index++]=rmtTranslate((*colors[i][color] >> (7-bitNum))&1); //shift down so desired bit is at the bottom, then bitwise and with 0x1 to isolate
+                items[index++]=rmtTranslate((colors[i][color] >> (7-bitNum))&1); //shift down so desired bit is at the bottom, then bitwise and with 0x1 to isolate
             }
         }
     }
@@ -155,8 +184,10 @@ void buildFrame(uint8_t *colors[stripLength][3], rmt_item32_t *items[stripLength
 /**
  * outputs the timing array created in buildFrame to the desired RMT channel 
  * (this confirms that every pin on a channel has identical output, need to give every pin its own channel to get individual addressabililty on each strip)
+ *
+ * items dimemsions [stripLength*24]
  */
-void push(rmt_item32_t *items[stripLength*24], uint8_t stripNum){
-    rmt_write_items(RMT_CHANNEL_0,*items, stripLength*24, 1); //output channel, output array, length of output array, hold output until finished
+void push(rmt_item32_t *items, uint8_t stripNum){
+    rmt_write_items(RMT_CHANNEL_0, items, stripLength*24, 1); //output channel, output array, length of output array, hold output until finished
     esp_rom_delay_us(50); //latching delay, pretty much just pauses the esp for 50us
 }

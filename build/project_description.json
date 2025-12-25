@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "CHAPTERROOMLIGHTS",
-    "project_version":    "1",
+    "project_version":    "84c0b23-dirty",
     "project_path":       "C:/Users/seanm/OneDrive/Documents/GitHub/ChapterRoomLights",
     "idf_path":           "C:/Users/seanm/OneDrive/Documents/GitHub/ESP/ESPIDF",
     "build_dir":          "C:/Users/seanm/OneDrive/Documents/GitHub/ChapterRoomLights/build",
