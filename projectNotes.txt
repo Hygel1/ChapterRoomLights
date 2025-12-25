@@ -1,0 +1,3 @@
+idf.py build in the project directory (the one that this file is located in)
+    looks like the build can compile with this in the project directory so that's good
+more notes to come I just think that this is a good place to put them and keep forgetting to make this file when I'm adding comments
